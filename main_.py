@@ -16,8 +16,8 @@ import os
 import time
 import re
 from dotenv import load_dotenv
-from decouple import Config
-config = Config()
+# from decouple import Config
+# config = Config()
 import tempfile
 import pandas as pd
 import numpy as np
@@ -31,9 +31,9 @@ from openpyxl.styles import numbers
 from openpyxl.styles import Border, Side
 from pandas.tseries.offsets import BDay
 locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
-st.set_page_config(layout="wide")
 
-download_path = r"C:\Users\JoãoPauloFumesBeneto\Downloads\Teste FPR"
+temp_dir = tempfile.gettempdir()
+download_path = f"{temp_dir}/Teste_FPR"
 st.markdown(
     """
     <style>
@@ -225,7 +225,7 @@ def extração_amplis(data):
     login_input = driver.find_element(By.ID, 
                                       'loginForm:userLoginInput:campo')
     # Configuração do Login
-    login = config("LOGIN")
+    login = "JBENETON"
     login_input.send_keys(login)
     
     time.sleep(1)
@@ -235,7 +235,7 @@ def extração_amplis(data):
         By.ID,
         'loginForm:userPasswordInput'
     )
-    password = config("PASSWORD")
+    password = "Qista@2025"
     password_input.send_keys(password)
 
     # Configuração de acesso
@@ -434,7 +434,7 @@ def extração_amplis(data):
 
 def main():
     st.title("Processamento dos arquivos")
-    DOWNLOAD_PATH = r"C:\\Users\\JoãoPauloFumesBeneto\\Downloads\\Teste FPR"
+    DOWNLOAD_PATH = os.path.join(tempfile.gettempdir(), "Teste_FPR")
     ARQUIVO_RENDA_FIXA = "01-Renda_Fixa.csv"
 
     # Verificar se o arquivo "01-Renda_Fixa.csv" existe dentro da pasta.
@@ -460,7 +460,7 @@ def main():
                 )
 
             dict = {}
-            download_path = r"C:\Users\JoãoPauloFumesBeneto\Downloads\Teste FPR"
+            download_path = f"{temp_dir}/Teste_FPR"
             arquivos = os.listdir(download_path)
             uploaded_file = os.path.join(download_path, arquivos[0])
 
