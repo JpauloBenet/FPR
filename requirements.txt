@@ -3,6 +3,6 @@ selenium
 webdriver-manager
 openpyxl
 python-dotenv
-decouple
+python-decouple
 pandas
 numpy
