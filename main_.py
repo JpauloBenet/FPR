@@ -30,7 +30,10 @@ from openpyxl import load_workbook
 from openpyxl.styles import numbers
 from openpyxl.styles import Border, Side
 from pandas.tseries.offsets import BDay
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+try:
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')  # Tenta definir para pt_BR
+except locale.Error:
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8') 
 
 temp_dir = tempfile.gettempdir()
 download_path = f"{temp_dir}/Teste_FPR"
