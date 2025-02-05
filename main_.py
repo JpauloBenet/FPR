@@ -228,15 +228,6 @@ def extração_amplis(data):
     login_input.send_keys(login)
     
     time.sleep(1)
-    
-    # Configuração do Password
-    password_input = driver.find_element(
-        By.ID,
-        'loginForm:userPasswordInput'
-    )
-    password = "Qista@2025"
-    password_input.send_keys(password)
-
     # Configuração de acesso
     entrar_button = WebDriverWait(
         driver=driver,
