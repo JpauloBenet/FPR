@@ -16,7 +16,8 @@ import os
 import time
 import re
 from dotenv import load_dotenv
-from decouple import config
+from decouple import Config
+config = Config()
 import tempfile
 import pandas as pd
 import numpy as np
