@@ -24,16 +24,12 @@ import numpy as np
 import zipfile
 import warnings
 from pandas.api.types import is_float_dtype
-import locale
 from io import BytesIO
 from openpyxl import load_workbook
 from openpyxl.styles import numbers
 from openpyxl.styles import Border, Side
 from pandas.tseries.offsets import BDay
-try:
-    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')  # Tenta definir para pt_BR
-except locale.Error:
-    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8') 
+
 
 temp_dir = tempfile.gettempdir()
 download_path = f"{temp_dir}/Teste_FPR"
@@ -987,10 +983,10 @@ def main():
                 st.dataframe(df_pl)
                 st.write("#### DataFrame Saldo")
                 st.dataframe(df_saldo)
-                st.write(f'Total da coluna Saldo: {locale.format_string('%.2f', df_saldo['SALDO'].sum(), grouping=True)}')
-            st.write(f'Toda da coluna RWA: {locale.format_string('%.2f', df_saldo['RWA'].sum(), grouping=True)}')
+                st.write(f'Total da coluna Saldo: {df_saldo["SALDO"].sum():,.2f}')
+            st.write(f'Total da coluna RWA: {df_saldo["RWA"].sum():,.2f}')
             expo = df_saldo['SALDO'].sum() - pagar
-            st.write(f'EXPO: {locale.format_string('%.2f', expo, grouping=True)}')
+            st.write(f'EXPO: {expo:,.2f}')
             st.markdown(
             f"""
             <div style="text-align: center; font-size: 24px; font-weight: bold; color: white;">
