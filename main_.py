@@ -4,7 +4,7 @@ import tempfile
 import os
 import time
 import re
-import locale
+# import locale
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -14,7 +14,7 @@ from openpyxl.utils import get_column_letter
 from pandas.api.types import is_float_dtype
 from pandas.tseries.offsets import BDay
 
-locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+# locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 st.set_page_config(layout="wide")
 st.markdown(
     """
@@ -694,10 +694,10 @@ if uploaded_zip is not None:
                 st.dataframe(df_pl)
                 st.write("#### DataFrame Saldo")
                 st.dataframe(df_saldo)
-                st.write(f'Total da coluna Saldo: {locale.format_string('%.2f', df_saldo['SALDO'].sum(), grouping=True)}')
-            st.write(f'Toda da coluna RWA: {locale.format_string('%.2f', df_saldo['RWA'].sum(), grouping=True)}')
+                # st.write(f'Total da coluna Saldo: {locale.format_string('%.2f', df_saldo['SALDO'].sum(), grouping=True)}')
+            # st.write(f'Toda da coluna RWA: {locale.format_string('%.2f', df_saldo['RWA'].sum(), grouping=True)}')
             expo = df_saldo['SALDO'].sum() - pagar
-            st.write(f'EXPO: {locale.format_string('%.2f', expo, grouping=True)}')
+            # st.write(f'EXPO: {locale.format_string('%.2f', expo, grouping=True)}')
             st.markdown(
             f"""
             <div style="text-align: center; font-size: 24px; font-weight: bold; color: white;">
