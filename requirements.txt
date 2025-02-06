@@ -6,3 +6,4 @@ python-dotenv
 python-decouple
 pandas
 numpy
+XlsxWriter
