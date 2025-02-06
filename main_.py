@@ -202,16 +202,16 @@ if uploaded_zip is not None:
                     'Informe a data desejada:',
                     placeholder="Exemplo: 31/12/2024"
                 )
-            if "cota" not in st.session_state or "investimento" not in st.session_state:
-                with col_fund3:
-                    cota = st.selectbox("Selecione o tipo de cota:", options=['SUB', 'SR'], index=0)
-                with col_fund4:
-                    investimento = st.number_input("Informe o valor do Investimento:",
-                                                    min_value=0.0,
-                                                    step=0.01,
-                                                    format="%.2f",
-                                                    # help="Digite o valor do Investimento."
-                                                    )
+            # if "cota" not in st.session_state or "investimento" not in st.session_state:
+            with col_fund3:
+                cota = st.selectbox("Selecione o tipo de cota:", options=['SUB', 'SR'], index=0)
+            with col_fund4:
+                investimento = st.number_input("Informe o valor do Investimento:",
+                                                min_value=0.0,
+                                                step=0.01,
+                                                format="%.2f",
+                                                # help="Digite o valor do Investimento."
+                                                )
             col_fund5, col_fund6 = st.columns(2)
             with col_fund5:
                 uploaded_csv = st.file_uploader("Faça o upload do arquivo CSV (Estoque):", type=["csv", "xlsx"])
