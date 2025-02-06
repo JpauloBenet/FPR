@@ -1,60 +1,37 @@
 import streamlit as st
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.action_chains import ActionChains
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import Select
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from openpyxl import load_workbook
-from openpyxl.styles import Alignment
-from openpyxl.utils import get_column_letter
-from datetime import datetime
+import zipfile
+import tempfile
 import os
 import time
 import re
-from dotenv import load_dotenv
-# from decouple import Config
-# config = Config()
-import tempfile
+import locale
 import pandas as pd
 import numpy as np
-import zipfile
-import warnings
-from pandas.api.types import is_float_dtype
 from io import BytesIO
 from openpyxl import load_workbook
-from openpyxl.styles import numbers
-from openpyxl.styles import Border, Side
+from openpyxl.styles import numbers, Border, Side
+from openpyxl.utils import get_column_letter
+from pandas.api.types import is_float_dtype
 from pandas.tseries.offsets import BDay
 
-
-temp_dir = tempfile.gettempdir()
-download_path = f"{temp_dir}/Teste_FPR"
+locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
+st.set_page_config(layout="wide")
 st.markdown(
     """
     <style>
-
-    /* Fundo da página */
+    /* Fundo da página e estilos customizados */
     .stApp {
         background-color: #064635; 
         color: #ffffff;
     }
-    /* Centralizar o título */
     h1 {
         text-align: center;
         color: #ffffff;
     }
-
-    /* Estilizar o texto acima das labels */
     label {
         color: #ffffff !important;
         font-weight: bold;
     }
-
-    /* Estilizar o botão */
     div.stButton > button {
         color: #000000; 
         background-color: #ffffff;
@@ -62,13 +39,10 @@ st.markdown(
         font-weight: bold; 
         border-radius: 8px;
     }
-
-    /* Alterar a cor do ícone de ajuda para branco */
     div[data-testid="stTooltipIcon"] svg {
         color: #ffffff; 
         fill: #ffffff; 
     }
-    /* Estilizar mensagens de sucesso */
     div.stAlert {
         background-color: #ffffff;
         color: #ffffff !important;
@@ -77,69 +51,74 @@ st.markdown(
         font-weight: bold; 
         box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
     }
-
     div.stDownloadButton > button {
-        color: #000000; /* Texto preto */
-        background-color: #ffffff; /* Fundo branco */
-        padding: 10px 20px; /* Margens internas */
-        font-weight: bold; /* Texto em negrito */
-        border-radius: 8px; /* Bordas arredondadas */
+        color: #000000;
+        background-color: #ffffff;
+        padding: 10px 20px;
+        font-weight: bold;
+        border-radius: 8px;
     }
-    
     </style>
     <div>
-        <h1>Extração dos fundos no <br> ambiente AMPLIS</h1>
+        <h1>Extração dos fundos - Upload do Arquivo ZIP</h1>
     </div>
-    """,
-    unsafe_allow_html=True
+    """, unsafe_allow_html=True
 )
-
-#### ---- Funções ---- ####
+# ============================= #
+# ========== Funções ========== #
+# ============================= #
 def tratar_valores(valor):
-        if '(' in valor and ')' in valor:
-            valor = valor.replace('(', '').replace(')', '')
-            return -float(valor.replace('.', '').replace(',', '.'))
-        return float(valor.replace('.', '').replace(',', '.'))
+    # Remove espaços em branco
+    valor = valor.strip()
+    # Se estiver entre parênteses, trata como negativo
+    if valor.startswith('(') and valor.endswith(')'):
+        # Remove parênteses e faz as substituições necessárias
+        valor = valor.replace('(', '').replace(')', '')
+        return -float(valor.replace('.', '').replace(',', '.'))
+    return float(valor.replace('.', '').replace(',', '.'))
 
-def ler (caminho):
-        if caminho.name.endswith('.csv'):
-            temp1 = pd.read_csv(
-                caminho,
-                encoding='latin-1',
-                low_memory=False,
-                decimal=',',
-                sep=';'
-                )
-        elif caminho.name.endswith('.xlsx'):
-            temp1 = pd.read_excel(
-                caminho,
-                engine='openpyxl'  # Certifique-se de ter instalado o openpyxl
-            )
-        else:
-            raise ValueError("Formato de arquivo não suportado. Envie um arquivo CSV ou XLSX.")
-        return temp1
-        
+def ler(caminho):
+    """
+    Lê um arquivo CSV ou XLSX a partir do objeto de arquivo (upload via Streamlit).
+    """
+    if caminho.name.endswith('.csv'):
+        temp1 = pd.read_csv(
+            caminho,
+            encoding='latin-1',
+            low_memory=False,
+            decimal=',',
+            sep=';'
+        )
+    elif caminho.name.endswith('.xlsx'):
+        temp1 = pd.read_excel(
+            caminho,
+            engine='openpyxl'
+        )
+    else:
+        raise ValueError("Formato de arquivo não suportado. Envie um arquivo CSV ou XLSX.")
+    return temp1
+
 def calcular_atv_probl(row):
-        if row['ATRASO'] > 90:
-            proporcao = row['PDD_PROPORCIONAL'] / row['VP_PROPORCIONAL']
-            if proporcao < 0.2:
-                return 1.5
-            elif proporcao < 0.5:
-                return 1
-            else:
-                return 0.5
+    if row['ATRASO'] > 90:
+        proporcao = row['PDD_PROPORCIONAL'] / row['VP_PROPORCIONAL']
+        if proporcao < 0.2:
+            return 1.5
+        elif proporcao < 0.5:
+            return 1
         else:
-            return "N"
+            return 0.5
+    else:
+        return "N"
 
 def classificar_pessoa(doc_sacado):
-        if len(doc_sacado) == 18:
-            return "PJ"
-        else:
-            return "PF"
+    if len(doc_sacado) == 18:
+        return "PJ"
+    else:
+        return "PF"
 
 def atualizar_rwa(dataframe):
-        dataframe['RWA'] = dataframe['SALDO'] * dataframe['FPR']
-        return dataframe
+    dataframe['RWA'] = dataframe['SALDO'] * dataframe['FPR']
+    return dataframe
 
 def ativ_probl(row, data):
     data = pd.to_datetime(data, format='%d/%m/%Y', dayfirst=True)
@@ -148,295 +127,70 @@ def ativ_probl(row, data):
     else:
         return 'N'
 
-# Carrega o arquivo .env
-load_dotenv()
-
-# ----- Inputs ----- #
-data = st.text_input(
-    "Informe a data de extração (dd/mm/YYYY):",
-    placeholder="Exemplo: 31/12/2024")
-
-def valores_únicos(caminho_arquivo, coluna):
-    
-    try:
-        df = pd.read_csv(
-            caminho_arquivo,
-            sep=';', 
-            encoding='latin1', 
-            on_bad_lines='skip' 
-            )
-        valores = df[coluna].dropna().unique()
-        return valores
-    
-    except Exception as e:
-        st.error(f"Erro ao carregar o arquivo: {e}")
-        return []
-
 @st.cache_data
-# Validação de datas:
 def validar_data(data):
-    '''
-    Verificação se, a string informada pelo usuário, segue o padrão
-    do ambiente AMPLIS. Caso a data informada não siga o padrão dd/mm/YYYY,
-    a expressão retorna None. 
-    '''
+    """
+    Valida se a string informada segue o formato dd/mm/YYYY.
+    """
     return bool(re.match(r"^\d{2}/\d{2}/\d{4}$", data))
 
-# ----- WebScraping ----- #
-def extração_amplis(data):
-    # Verificação se o diretório existe e, caso ele não exista, cria o diretório.
-    if not os.path.exists(download_path):
-        # Criação do diretório.
-        os.makedirs(download_path)
+def extrair_zip(zip_file_obj):
+    """
+    Recebe um objeto BytesIO com os dados do ZIP e extrai seu conteúdo
+    para um diretório temporário. Retorna o caminho de extração e o objeto TemporaryDirectory.
+    """
+    temp_dir = tempfile.TemporaryDirectory()
+    temp_path = temp_dir.name
+    with zipfile.ZipFile(zip_file_obj) as zip_ref:
+        zip_ref.extractall(temp_path)
+    return temp_path, temp_dir
 
-    # Configurações específicas para o navegador Google Chrome no contexto do Selenium WebDriver.
-    # Personalização do comportamento do navegador durante a automação.
-    chrome_options = webdriver.ChromeOptions() # Criação do objeto, que permite configurar as opções do navegador.
-    prefs = {
-        "download.default_directory": download_path, # Definição do diretório padrão onde os arquivos baixados serão salvos
-        "download.prompt_for_download": False, # Desativação do prompt que aparece ao iniciar um download
-        "profile.default_content_settings.popups": 0, # Desativação dos pop-ups relacionados ao download
-        "safebrowsing.enabled": True, # Proteção contra sites maliciosos
-    }
-    chrome_options.add_experimental_option(
-        "prefs", # O Chrome possui diversas "opções experimentais", e "prefs" é uma delas,
-                 # usada para definir preferências de comportamento do navegador.
-          prefs
-          ) # Adição das preferências
+def valores_únicos(df, coluna):
+    try:
+        valores = df[coluna].dropna().unique()
+        return valores
+    except Exception as e:
+        st.error(f"Erro ao extrair valores únicos: {e}")
+        return []
+#############################################
+#         UPLOAD DO ARQUIVO ZIP             #
+#############################################
+
+st.markdown("### Faça o upload do arquivo ZIP contendo os arquivos:")
+uploaded_zip = st.file_uploader("Upload ZIP", type=["zip"])
+
+if uploaded_zip is not None:
+    zip_bytes = BytesIO(uploaded_zip.read())
     
-    # Inicialização
-    serviço = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(
-        service=serviço,
-        options=chrome_options
-    )
-
-    # Acesso a página do AMPLIS:
-    driver.get("https://idltrust.totvs.amplis.com.br/amplis/login/SEC_00001.jsf")
-    driver.maximize_window() # Maximização da tela.
-
-    # Criação de uma espera explícita; aguarda até uma condição específica.
-    WebDriverWait(
-        driver=driver,
-        timeout=10 # Tempo máximo aguardando
-        ).until(EC.presence_of_all_elements_located((By.ID, 'loginForm:userLoginInput:campo'))) # Condição que precisa ser atendida.
-    # Localização do elemento na página com base no ID.
-    login_input = driver.find_element(By.ID, 
-                                      'loginForm:userLoginInput:campo')
-    # Configuração do Login
-    login = "JBENETON"
-    login_input.send_keys(login)
+    extraction_path, temp_dir_obj = extrair_zip(zip_bytes)
+    st.success("Arquivo ZIP extraído com sucesso!")
     
-    time.sleep(1)
-    # Configuração de acesso
-    entrar_button = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(EC.element_to_be_clickable((By.ID, 'loginForm:botaoOk'))) # Condição que o botão esteja "clicável"
-    # Clicando no Botão usando JavaScript
-    # entrar_button.click()
-    driver.execute_script("arguments[0].click();", entrar_button)
-    time.sleep(5)
-
-    # ----- Ir até a Carteira Diária ----- #
-    relatório_menu = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.presence_of_element_located((By.ID, 'menuRelatoriosButtonSpan'))
-    )
-    patrimônio_menu = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.presence_of_element_located((By.XPATH, '//*[@id="dropdownMenuRelatorios"]/li[2]'))
-    )
-
-    # Criar um ActionChain para mover o mouse até o elemento "Relatórios"
-    action = ActionChains(
-        driver=driver
-        ).move_to_element(relatório_menu).perform()
-    time.sleep(1)
-
-    # Criar um ActionChain para mover o mouse até o elemento "Patrimônio"
-    action=ActionChains(
-        driver=driver
-    ).move_to_element(
-        patrimônio_menu
-    ).perform()
-    time.sleep(1)
-
-    # Criar um ActionChain para mover o mouse até o elemento "Carteira Diária"
-    carteira_diária = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.element_to_be_clickable((By.ID, "mainForm:j_id_62:1:j_id_6n:0:j_id_82"))
-    ).click()
-
-    # ----- Alteração da Data ----- #
-    
-    # Localizar o ambiente da data inicial.
-    período_input = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.presence_of_element_located((By.ID, 'mainForm:calendarDateBegin:campoInputDate'))
-    )
-    
-    # Clicar no ambiente.
-    período_input.click()
-    time.sleep(1)
-
-    # Limpar o ambiente.
-    período_input.clear()
-    time.sleep(1)
-
-    # Adicionando a data exposta pelo usuário.
-    # período_input.send_keys(data)
-    driver.execute_script("arguments[0].value = arguments[1];", período_input, data)
-
-    # Localizar o ambiente da data final.
-    final_input = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.presence_of_element_located((By.ID, 'mainForm:calendarDateEnd:campoInputDate'))
-    )
-    # Clicar no ambiente.
-    final_input.click()
-    time.sleep(1)
-
-    # Limpar o ambiente.
-    final_input.clear()
-    time.sleep(1)
-
-    # Adicionando a data exposta pelo usuário.
-    # período_input.send_keys(data)
-    driver.execute_script("arguments[0].value = arguments[1];", final_input, data)
-
-    # Enter para a confirmação da escolha
-    final_input.send_keys(Keys.RETURN)
-
-    print(f'Data {data} selecionada com sucesso!')
-    time.sleep(2)
-
-    # ----- Seleção de todos os Fundos ----- #
-    carteira = WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.presence_of_element_located((By.ID, 'mainForm:portfolioPickList:firstSelect'))
-    )
-    time.sleep(3)
-
-    # Cria uma instância Select para interagir com a lista
-    select_carteira = Select(carteira)
-    
-    # Seleciona a primeira opção
-    primeira = select_carteira.options[0]
-    select_carteira.select_by_value(primeira.get_attribute("value"))
-    time.sleep(3)
-    
-    # Click no Botão para atualizar os fundos selecionados
-    WebDriverWait(
-        driver=driver,
-        timeout=10
-    ).until(
-        EC.element_to_be_clickable((By.ID, 'mainForm:portfolioPickList:includeAll'))
-    ).click()
-    time.sleep(1)
-
-    # ----- Seleção da Opção: CSV ----- #
-    dropdown = driver.find_element(
-        By.ID,
-        "mainForm:saida:campo"
-    )
-
-    # Usar a classe Select para interagir com o dropdown
-    select = Select(dropdown)
-
-    # Selecionar a opção "CSV"
-    select.select_by_visible_text("CSV")
-    time.sleep(5)
-
-    # ----- Download ----- #
-    select_button = WebDriverWait(
-        driver, 
-        10
-        ).until(
-            EC.presence_of_element_located((By.ID, "mainForm:confirmButton"))
-        ).click()
-
-    timeout = 100000 # Tempo máximo em segundos
-    start_time = time.time()
-
-    while True:
-        # Verificação se há arquivos no diretório
-        files = [f for f in os.listdir(download_path) if f.endswith(".zip")]
-        if files: # Se encontrar o arquivo CSV.
-            print("Download realizado")
-            break
-        if time.time() - start_time > timeout:
-            print("Tempo Limite excedido. Download não concluído.")
-            driver.quit()
-            exit()
-        
-        # Aguarda 3 segundo antes de verificar novamente.
-        time.sleep(3)
-    
-    driver.quit()
-
-    ############### FIM ###############
+    extracted_files = os.listdir(extraction_path)
+    st.write("Arquivos extraídos:", extracted_files)
     
     dict = {}
-    arquivos = os.listdir(download_path)
-    uploaded_file = os.path.join(download_path, arquivos[0])
-
-    if uploaded_file is not None: # atribuir o conteúdo do zip nesta variável.
+    for arquivo in extracted_files:
         try:
-            with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
-                zip_ref.extractall(download_path)
+            if re.match(r"^\d+", arquivo) and arquivo.endswith('.csv'):
+                key = re.search(r"-(.*)\.csv$", arquivo).group(1)
+                caminho_arquivo = os.path.join(extraction_path, arquivo)
+                df_temp = pd.read_csv(caminho_arquivo, sep=';', encoding='latin1', on_bad_lines='skip')
+                dict[key] = df_temp
+        except Exception as e:
+            st.error(f"Erro ao processar o arquivo '{arquivo}': {e}")
+    st.write('Resumo dos DataFrames: ')
+    for key, df in dict.items():
+        st.write(f"**{key}**: {df.shape[0]} linhas, {df.shape[1]} colunas")
+    
+    valores = valores_únicos(df=dict['Renda_Fixa'], coluna='CARTEIRA')
+    print('Valores únicos(Fundos): ')
+    print(valores)
+    print()
+
+    valor_inicial = "FIDC REAG H Y" if "FIDC REAG H Y" in valores else valores[0]
+    if valores.size > 0:
             
-            # Listar os arquivos extraídos
-            extracted_files = os.listdir(download_path)
-            st.write("Arquivos Extraídos com sucesso!")
-            # st.write(extracted_files)
-
-            for arquivo in extracted_files:
-                try:
-                    if re.match(r"^\d+", arquivo) and arquivo.endswith('.csv'):
-                        key = re.search(r"-(.*)\.csv$", arquivo).group(1)
-                        caminho_arquivo = os.path.join(download_path, arquivo)
-                        df = pd.read_csv(caminho_arquivo, sep=';', encoding='latin1', on_bad_lines='skip')
-                        dict[key] = df
-                        print(f"DataFrame para '{key}' adicionado ao dicionário.")
-                except Exception as e:
-                    print(f"Erro ao processar o arquivo '{arquivo}': {e}")
-            
-            # st.write("Resumo dos DataFrames carregados:")
-            # for key, df in dict.items():
-            #     st.write(f"**{key}**: {df.shape[0]} linhas, {df.shape[1]} colunas")
-            #     st.dataframe(df)
-        
-        except zipfile.BadZipFile:
-            st.error("O arquivo carregado não é válido.")
-
-def main():
-    st.title("Processamento dos arquivos")
-    DOWNLOAD_PATH = os.path.join(tempfile.gettempdir(), "Teste_FPR")
-    ARQUIVO_RENDA_FIXA = "01-Renda_Fixa.csv"
-
-    # Verificar se o arquivo "01-Renda_Fixa.csv" existe dentro da pasta.
-    caminho_renda_fixa = os.path.join(DOWNLOAD_PATH, ARQUIVO_RENDA_FIXA)
-    if os.path.exists(caminho_renda_fixa):
-        print('Caminho Existente.')
-
-        valores = valores_únicos(caminho_renda_fixa, 'CARTEIRA')
-        valor_inicial = "FIDC REAG H Y" if "FIDC REAG H Y" in valores else valores[0]
-
-        if valores.size > 0:
-            col_fund1, col_fund2 = st.columns(2)
+            col_fund1, col_fund2, col_fund3, col_fund4 = st.columns(4)
             with col_fund1:
                 opção_selecionada = st.selectbox(
                     'Selecione um fundo:',
@@ -448,62 +202,25 @@ def main():
                     'Informe a data desejada:',
                     placeholder="Exemplo: 31/12/2024"
                 )
-
-            dict = {}
-            download_path = f"{temp_dir}/Teste_FPR"
-            arquivos = os.listdir(download_path)
-            uploaded_file = os.path.join(download_path, arquivos[0])
-
-            if uploaded_file is not None: # atribuir o conteúdo do zip nesta variável.
-
-                extracted_files = os.listdir(download_path)
-                # st.write("Arquivos Extraídos: ")
-                # st.write(extracted_files)
-
-                for arquivo in extracted_files:
-                    try:
-                        if re.match(r"^\d+", arquivo) and arquivo.endswith('.csv'):
-                            key = re.search(r"-(.*)\.csv$", arquivo).group(1)
-                            caminho_arquivo = os.path.join(download_path, arquivo)
-                            df = pd.read_csv(caminho_arquivo, sep=';', encoding='latin1', on_bad_lines='skip')
-                            df_filtrado = df[df["CARTEIRA"] == opção_selecionada]
-                            df_filtrado = df_filtrado.reset_index(drop=True)
-                            dict[key] = df_filtrado
-                            print(f"DataFrame para '{key}' adicionado ao dicionário.")
-                    except Exception as e:
-                        print(f"Erro ao processar o arquivo '{arquivo}': {e}")
-                
-                # st.write("Resumo dos DataFrames carregados:")
-                # for key, df_filtrado in dict.items():
-                #     st.write(f"**{key}**: {df_filtrado.shape[0]} linhas, {df_filtrado.shape[1]} colunas")
-                #     st.dataframe(df)
-        else:
-            st.warning('Nenhum valor encontrado.')
-    else:
-        st.error("Arquivo '01-Renda_Fixa.csv' não encontrado. Clique no botão 'Execução' para gerar os arquivos.")
-    
-    col_up1, col_up2 = st.columns(2)
-    with col_up1:
-        uploaded_csv = st.file_uploader("Faça o upload do arquivo CSV (Estoque):", type=["csv", "xlsx"])
-    with col_up2:
-        uploaded_excel = st.file_uploader("Faça o upload do arquivo Posição:", type=["xlsx", "csv", "xls"])
-
-
-    if "cota" not in st.session_state or "investimento" not in st.session_state:
-        col_in1, col_in2 = st.columns(2)
-        with col_in1:
-            cota = st.selectbox("Selecione o tipo de cota:", options=['SUB', 'SR'], index=0)
-        with col_in2:
-            investimento = st.number_input("Informe o valor do Investimento:",
-                                            min_value=0.0,
-                                            step=0.01,
-                                            format="%.2f",
-                                            # help="Digite o valor do Investimento."
-                                            )
-
-        if st.button("Executar Análise"):
-            st.session_state["cota"] = cota
-            st.session_state["investimento"] = investimento
+            if "cota" not in st.session_state or "investimento" not in st.session_state:
+                with col_fund3:
+                    cota = st.selectbox("Selecione o tipo de cota:", options=['SUB', 'SR'], index=0)
+                with col_fund4:
+                    investimento = st.number_input("Informe o valor do Investimento:",
+                                                    min_value=0.0,
+                                                    step=0.01,
+                                                    format="%.2f",
+                                                    # help="Digite o valor do Investimento."
+                                                    )
+            col_fund5, col_fund6 = st.columns(2)
+            with col_fund5:
+                uploaded_csv = st.file_uploader("Faça o upload do arquivo CSV (Estoque):", type=["csv", "xlsx"])
+            with col_fund6:
+                uploaded_excel = st.file_uploader("Faça o upload do arquivo Posição:", type=["xlsx", "csv", "xls"])
+            
+            if st.button("Executar Análise"):
+                st.session_state["cota"] = cota
+                st.session_state["investimento"] = investimento
 
     if "cota" in st.session_state and "investimento" in st.session_state:
         cota = st.session_state["cota"]
@@ -512,6 +229,7 @@ def main():
         #### ---- Obtenção do PL ---- ####
         # RENDA FIXA
         renda_fixa = dict['Renda_Fixa']
+        renda_fixa = renda_fixa[renda_fixa["CARTEIRA"] == opção_selecionada]
         
         # Verifica se o fundo que estamos utilizando para o cálculo envolve o FIDC CONSIG PUB
         if renda_fixa['CARTEIRA'].str.contains('FIDC CONSIG PUB').any():
@@ -524,21 +242,27 @@ def main():
         renda_fixa_grouped = renda_fixa.groupby('TITULO', as_index=False)['VALORLIQUIDO'].sum()
 
         patrimonio = dict['Patrimonio-Totais']
-        patrimonio['VALORPATRIMONIOLIQUIDO'] = patrimonio['VALORPATRIMONIOLIQUIDO'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).astype(float)
-        junior = patrimonio['VALORPATRIMONIOLIQUIDO'][0]
+        patrimonio = patrimonio[patrimonio['CARTEIRA'] == opção_selecionada]  
+        patrimonio['VALORPATRIMONIOLIQUIDO'] = patrimonio['VALORPATRIMONIOLIQUIDO']\
+    .astype(str)\
+    .apply(tratar_valores)
+        patrimonio = patrimonio.reset_index(drop=True)
+        junior = patrimonio.loc[0, 'VALORPATRIMONIOLIQUIDO']
 
         titulos_desejados = ['COTA MEZANINO', 'COTA SENIOR']
         renda_fixa_filtrada = renda_fixa_grouped[renda_fixa_grouped['TITULO'].isin(titulos_desejados)]
         soma_total = renda_fixa_filtrada['VALORLIQUIDO'].sum() + junior
 
         print('Valor do PL Final:', soma_total)
+        print()
 
         df_pl = renda_fixa_filtrada.set_index('TITULO')
         df_pl.loc['COTA JUNIOR'] = [junior]
         df_pl.loc['PL'] = [soma_total]
         print('DataFrame do PL:')
         print(df_pl)
-        
+        print()
+
         #### ---- Obtenção do Saldo ---- ####
 
         if uploaded_csv is not None:
@@ -561,22 +285,12 @@ def main():
                 )
 
         soma_valores = combined_df
-        soma_valores['DATA_REFERENCIA'] = pd.to_datetime(soma_valores["DATA_REFERENCIA"],
-                                                        # format='%d/%m/%Y',
-                                                        # dayfirst=True
-                                                        )
-        soma_valores['DATA_VENCIMENTO_AJUSTADA_2'] = pd.to_datetime(soma_valores['DATA_VENCIMENTO_AJUSTADA_2'],
-                                                                    # format='%d/%m/%Y',
-                                                                    # dayfirst=True
-                                                                    )
+        soma_valores['DATA_REFERENCIA'] = pd.to_datetime(soma_valores["DATA_REFERENCIA"])
+        soma_valores['DATA_VENCIMENTO_AJUSTADA_2'] = pd.to_datetime(soma_valores['DATA_VENCIMENTO_AJUSTADA_2'])
         soma_valores['ATRASO'] = (soma_valores['DATA_REFERENCIA'] - soma_valores['DATA_VENCIMENTO_AJUSTADA_2']).dt.days
-        soma_valores['DATA_EMISSAO_2'] = pd.to_datetime(soma_valores['DATA_EMISSAO_2'], 
-                                                        # format='%d/%m/%Y', 
-                                                        # dayfirst=True
-                                                        )
+        soma_valores['DATA_EMISSAO_2'] = pd.to_datetime(soma_valores['DATA_EMISSAO_2'])
         soma_valores['Ativo problemático'] = soma_valores.apply(ativ_probl, axis=1, data=data_mes)
         # CONTRATO:
-
         # Soma para valores com ATRASO > 90
         over_90_saldo = soma_valores.loc[soma_valores['ATRASO'] > 90, 'VALOR_PRESENTE'].sum()
         # Soma para valores com ATRASO < 90
@@ -587,18 +301,21 @@ def main():
         # Soma para valores com ATRASO < 90
         below_90_pdd = soma_valores.loc[soma_valores['ATRASO'] <= 90, 'VALOR_PDD'].sum()
         total_pdd = over_90_pdd + below_90_pdd
-
         contrato = total_saldo - total_pdd
         print('Contratos: ', contrato.round(2))
+        print()
 
         # CAIXA
-        patrimonio['SALDOCAIXAATUAL'] = patrimonio['SALDOCAIXAATUAL'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).astype(float)
+        patrimonio['SALDOCAIXAATUAL'] = patrimonio['SALDOCAIXAATUAL']\
+    .astype(str)\
+    .apply(tratar_valores)
         caixa = patrimonio['SALDOCAIXAATUAL'].iloc[0] 
         print('Caixa: ', caixa)
-
+        print()
         # CONTAS Á RECEBER E Á PAGAR
         try:
             contas = dict['CPR-Lancamentos']
+            contas = contas[contas["CARTEIRA"] == opção_selecionada]
             contas = contas[['MODALIDADE', 'VALOR']]
             contas.loc[:, 'VALOR'] = contas.loc[:, 'VALOR'].apply(tratar_valores)
             contas_resultados = contas.groupby(by='MODALIDADE')['VALOR'].sum()
@@ -610,12 +327,13 @@ def main():
         
         print("Pagar:", pagar)
         print("Receber:", receber)
+        print()
 
         # FUNDO
 
         if "Fundos-Fundos" in dict:
             fundos = dict['Fundos-Fundos']
-
+            fundos = fundos[fundos["CARTEIRA"] == opção_selecionada]
             # Verifica se as colunas necessárias existem.
             if all(col in fundos.columns for col in ['CODIGO', 'VALORLIQUIDO']):
                 df_fundos = fundos[['CODIGO', 'VALORLIQUIDO']]
@@ -637,6 +355,7 @@ def main():
         # OUTROS ATIVOS
         if 'Outros_Ativos' in dict:
             ativos = dict['Outros_Ativos']
+            ativos = ativos[ativos["CARTEIRA"] == opção_selecionada]
             ativos_não_desejados = ['A VENCER', 'VENCIDOS', 'PDD']
             ativos_desejados = ativos[~ativos['ATIVO'].isin(ativos_não_desejados)]
             ativos_desejados.loc[:, 'VALOR'] = ativos_desejados.loc[:, 'VALOR'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).astype(float)
@@ -689,8 +408,8 @@ def main():
             print("OS VALORES SÃO DIFERENTES.")
             diferenca = df_saldo['SALDO'].sum().round(2) - soma_total.round(2)
             print(f"A DIFERENÇA É DE: {diferenca:,.2f}")
-
-    #### ---- Obtenção do DataBase ---- ####
+        
+        #### ---- Obtenção do DataBase ---- ####
         investimento = investimento
         valor_investido = investimento
         valor_investido = float(valor_investido)
@@ -748,7 +467,7 @@ def main():
         print("DataFrame Saldo Atualizado:")
         print(df_saldo)
 
-    #### ---- Obtenção do FPR Final Apurado ---- ####
+        #### ---- Obtenção do FPR Final Apurado ---- ####
         def calcular_fpr_final(df_saldo, df_pl, soma_total, over_90_saldo, over_90_pdd, pagar, receber, cota):
             outros = 0
             if 'Ajuste' in df_saldo.index and pd.notna(df_saldo.loc['Ajuste', 'SALDO'] and df_saldo.loc['Ajuste', 'SALDO'] != 0):
@@ -925,8 +644,8 @@ def main():
             print('# ---- Valor Final para o FPR ---- #')
             print(f"{FPR_apurado:.0%}")
             return FPR_apurado
-        
-    #### ---- Interface do Streamlit ---- #####
+
+        #### ---- Interface do Streamlit ---- #####
         st.title("Editar DataFrame Dinamicamente no Streamlit")
 
         # Selecionar as colunas a serem exibidas.
@@ -958,6 +677,7 @@ def main():
         # Atualizar o DataFrame original
         df_saldo = updated_df
         df_saldo = df_saldo[~df_saldo.index.isin(["Renda Fixa", "Outros Ativos"])]
+        
         st.markdown(
         """
         <hr style="border: 1px solid white; margin: 20px 0;">
@@ -974,10 +694,10 @@ def main():
                 st.dataframe(df_pl)
                 st.write("#### DataFrame Saldo")
                 st.dataframe(df_saldo)
-                st.write(f'Total da coluna Saldo: {df_saldo["SALDO"].sum():,.2f}')
-            st.write(f'Total da coluna RWA: {df_saldo["RWA"].sum():,.2f}')
+                st.write(f'Total da coluna Saldo: {locale.format_string('%.2f', df_saldo['SALDO'].sum(), grouping=True)}')
+            st.write(f'Toda da coluna RWA: {locale.format_string('%.2f', df_saldo['RWA'].sum(), grouping=True)}')
             expo = df_saldo['SALDO'].sum() - pagar
-            st.write(f'EXPO: {expo:,.2f}')
+            st.write(f'EXPO: {locale.format_string('%.2f', expo, grouping=True)}')
             st.markdown(
             f"""
             <div style="text-align: center; font-size: 24px; font-weight: bold; color: white;">
@@ -1038,7 +758,8 @@ def main():
 
         st.write("## 3) Arquivo Posição:")
         st.write('### Arquivo Modelo:')
-        st.write("*Utilize o DataFrame abaixo como modelo; em tese, é o arquivo enviado do mês anterior.")
+        st.write("* Utilize o DataFrame abaixo como modelo; em tese, é o arquivo enviado do mês anterior.")
+        st.write("* Caso não apareça o DataFrame Modelo abaixo, utilize o comando: streamlit run app.py --server.maxMessageSize 500")
         if uploaded_excel is not None:
             df_excel = pd.read_excel(uploaded_excel)
             st.dataframe(df_excel)
@@ -1149,6 +870,12 @@ def main():
                 proximo_dia_util = (pd.to_datetime(data_mes) + BDay(1)).strftime('%d/%m/%Y')
                 posicao.loc[posicao['Produto'] == i, 'Data Vencimento'] = proximo_dia_util
                 posicao.loc[posicao['Produto'] == i, 'Ativo problemático'] = 'N'
+        
+        mask = posicao['Produto'].str.startswith('F')
+        posicao.loc[mask, 'Sistema Origem'] = posicao.loc[mask, 'Produto']
+        posicao.loc[mask, 'Produto'] = "TVM - FUNDO"
+        mask_other = (posicao['Produto'] == 'DC FURTADO COELHO AD') | (posicao['Produto'] == 'RECURAÇÃO JUDICIAL')
+        posicao.loc[mask_other, 'Produto'] = 'VALOR_A_RECEBER_FIDC'
 
         edited_posicao = st.data_editor(posicao, num_rows="dynamic", use_container_width=True, height=600)
 
@@ -1341,26 +1068,3 @@ def main():
                 file_name=f"arquivo_convertido_{str(opção_selecionada)}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-# ----- Execução ----- #
-if st.button("Execução"):
-    if not validar_data(data=data):
-        st.error("Insira uma data válida no formato dd/mm/YYYY")
-    else:
-        try:
-            extração_amplis(data)
-            st.success("Extração concluída!")
-        except TimeoutError as e:
-            st.error('Problemas com o AMPLIS, tente novamente após alguns instantes.')
-        except Exception as e:
-            st.error("Ocorreu um erro inesperado! Tente novamente após alguns instantes.")
-    
-    # if not validar_data(data=data):
-    #     st.error("Insira uma data válida no formato dd/mm/YYYY")
-    # else:
-    #     extração_amplis(data=data)
-main()
-
-
-
-
