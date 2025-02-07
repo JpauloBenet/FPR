@@ -59,7 +59,7 @@ st.markdown(
     }
     </style>
     <div>
-        <h1>Extração dos fundos - Upload do Arquivo ZIP</h1>
+        <h1>Cálculo FPR - Extração Arquivo Posição</h1>
     </div>
     """, unsafe_allow_html=True
 )
@@ -167,7 +167,7 @@ if uploaded_zip is not None:
     st.success("Arquivo ZIP extraído com sucesso!")
     
     extracted_files = os.listdir(extraction_path)
-    st.write("Arquivos extraídos:", extracted_files)
+    # st.write("Arquivos extraídos:", extracted_files)
     
     dict = {}
     for arquivo in extracted_files:
@@ -179,9 +179,9 @@ if uploaded_zip is not None:
                 dict[key] = df_temp
         except Exception as e:
             st.error(f"Erro ao processar o arquivo '{arquivo}': {e}")
-    st.write('Resumo dos DataFrames: ')
-    for key, df in dict.items():
-        st.write(f"**{key}**: {df.shape[0]} linhas, {df.shape[1]} colunas")
+    # st.write('Resumo dos DataFrames: ')
+    # for key, df in dict.items():
+        # st.write(f"**{key}**: {df.shape[0]} linhas, {df.shape[1]} colunas")
     
     valores = valores_únicos(df=dict['Renda_Fixa'], coluna='CARTEIRA')
     print('Valores únicos(Fundos): ')
