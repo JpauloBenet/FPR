@@ -15,54 +15,6 @@ from pandas.tseries.offsets import BDay
 
 st.set_page_config(layout="wide")
 
-st.markdown(
-    """
-    <style>
-    /* Fundo da página e estilos customizados */
-    .stApp {
-        background-color: #064635; 
-        color: #ffffff;
-    }
-    h1 {
-        text-align: center;
-        color: #ffffff;
-    }
-    label {
-        color: #ffffff !important;
-        font-weight: bold;
-    }
-    div.stButton > button {
-        color: #000000; 
-        background-color: #ffffff;
-        padding: 10px 20px; 
-        font-weight: bold; 
-        border-radius: 8px;
-    }
-    div[data-testid="stTooltipIcon"] svg {
-        color: #ffffff; 
-        fill: #ffffff; 
-    }
-    div.stAlert {
-        background-color: #ffffff;
-        color: #ffffff !important;
-        border-radius: 10px; 
-        padding: 10px; 
-        font-weight: bold; 
-        box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
-    }
-    div.stDownloadButton > button {
-        color: #000000;
-        background-color: #ffffff;
-        padding: 10px 20px;
-        font-weight: bold;
-        border-radius: 8px;
-    }
-    </style>
-    <div>
-        <h1>Cálculo FPR - Extração Arquivo Posição</h1>
-    </div>
-    """, unsafe_allow_html=True
-)
 # ============================= #
 # ========== Funções ========== #
 # ============================= #
