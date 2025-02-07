@@ -4,7 +4,6 @@ import tempfile
 import os
 import time
 import re
-# import locale
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -14,8 +13,8 @@ from openpyxl.utils import get_column_letter
 from pandas.api.types import is_float_dtype
 from pandas.tseries.offsets import BDay
 
-# locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 st.set_page_config(layout="wide")
+
 st.markdown(
     """
     <style>
@@ -152,6 +151,7 @@ def valores_únicos(df, coluna):
     except Exception as e:
         st.error(f"Erro ao extrair valores únicos: {e}")
         return []
+
 #############################################
 #         UPLOAD DO ARQUIVO ZIP             #
 #############################################
@@ -160,6 +160,7 @@ st.markdown("### Faça o upload do arquivo ZIP contendo os arquivos:")
 uploaded_zip = st.file_uploader("Upload ZIP", type=["zip"])
 
 if uploaded_zip is not None:
+    st.success("Arquivo ZIP extraído com sucesso!")
     zip_bytes = BytesIO(uploaded_zip.read())
     
     extraction_path, temp_dir_obj = extrair_zip(zip_bytes)
@@ -189,7 +190,8 @@ if uploaded_zip is not None:
 
     valor_inicial = "FIDC REAG H Y" if "FIDC REAG H Y" in valores else valores[0]
     if valores.size > 0:
-            
+
+        with st.form("form_opcoes"):
             col_fund1, col_fund2, col_fund3, col_fund4 = st.columns(4)
             with col_fund1:
                 opção_selecionada = st.selectbox(
@@ -202,31 +204,27 @@ if uploaded_zip is not None:
                     'Informe a data desejada:',
                     placeholder="Exemplo: 31/12/2024"
                 )
-            # if "cota" not in st.session_state or "investimento" not in st.session_state:
             with col_fund3:
                 cota = st.selectbox("Selecione o tipo de cota:", options=['SUB', 'SR'], index=0)
             with col_fund4:
                 investimento = st.number_input("Informe o valor do Investimento:",
-                                                min_value=0.0,
-                                                step=0.01,
-                                                format="%.2f",
-                                                # help="Digite o valor do Investimento."
-                                                )
+                                            min_value=0.0,
+                                            step=0.01,
+                                            format="%.2f")
             col_fund5, col_fund6 = st.columns(2)
             with col_fund5:
                 uploaded_csv = st.file_uploader("Faça o upload do arquivo CSV (Estoque):", type=["csv", "xlsx"])
             with col_fund6:
                 uploaded_excel = st.file_uploader("Faça o upload do arquivo Posição:", type=["xlsx", "csv", "xls"])
-            
-            if st.button("Executar Análise"):
-                st.session_state["cota"] = cota
-                st.session_state["investimento"] = investimento
+            # Também pode colocar outros inputs (como uploads adicionais) se necessário
+            submit_button = st.form_submit_button("Executar Análise")
 
-    if "cota" in st.session_state and "investimento" in st.session_state:
-        cota = st.session_state["cota"]
-        investimento = st.session_state["investimento"]      
+        # Só execute o processamento se o usuário submeteu o formulário:
+        if submit_button:
+            st.session_state["cota"] = cota
+            st.session_state["investimento"] = investimento
 
-        #### ---- Obtenção do PL ---- ####
+            #### ---- Obtenção do PL ---- ####
         # RENDA FIXA
         renda_fixa = dict['Renda_Fixa']
         renda_fixa = renda_fixa[renda_fixa["CARTEIRA"] == opção_selecionada]
@@ -757,12 +755,12 @@ if uploaded_zip is not None:
         unsafe_allow_html=True)
 
         st.write("## 3) Arquivo Posição:")
-        st.write('### Arquivo Modelo:')
-        st.write("* Utilize o DataFrame abaixo como modelo; em tese, é o arquivo enviado do mês anterior.")
-        st.write("* Caso não apareça o DataFrame Modelo abaixo, utilize o comando: streamlit run app.py --server.maxMessageSize 500")
+        # st.write('### Arquivo Modelo:')
+        # st.write("* Utilize o DataFrame abaixo como modelo; em tese, é o arquivo enviado do mês anterior.")
+        # # st.write("* Caso não apareça o DataFrame Modelo abaixo, utilize o comando: streamlit run app.py --server.maxMessageSize 500")
         if uploaded_excel is not None:
             df_excel = pd.read_excel(uploaded_excel)
-            st.dataframe(df_excel)
+            #st.dataframe(df_excel)
         else:
             st.warning("Nenhum arquivo Excel foi carregado.")
         
