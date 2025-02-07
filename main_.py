@@ -112,12 +112,10 @@ st.markdown("### Faça o upload do arquivo ZIP contendo os arquivos:")
 uploaded_zip = st.file_uploader("Upload ZIP", type=["zip"])
 
 if uploaded_zip is not None:
-    st.success("Arquivo ZIP extraído com sucesso!")
     zip_bytes = BytesIO(uploaded_zip.read())
     
     extraction_path, temp_dir_obj = extrair_zip(zip_bytes)
-    st.success("Arquivo ZIP extraído com sucesso!")
-    
+
     extracted_files = os.listdir(extraction_path)
     # st.write("Arquivos extraídos:", extracted_files)
     
