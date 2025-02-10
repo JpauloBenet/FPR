@@ -1,8 +1,11 @@
+# ============================= #
+# ======== Bibliotecas ======== #
+# ============================= #
+
 import streamlit as st
 import zipfile
 import tempfile
 import os
-import time
 import re
 import pandas as pd
 import numpy as np
@@ -18,12 +21,10 @@ st.set_page_config(layout="wide")
 # ============================= #
 # ========== Funções ========== #
 # ============================= #
+
 def tratar_valores(valor):
-    # Remove espaços em branco
     valor = valor.strip()
-    # Se estiver entre parênteses, trata como negativo
     if valor.startswith('(') and valor.endswith(')'):
-        # Remove parênteses e faz as substituições necessárias
         valor = valor.replace('(', '').replace(')', '')
         return -float(valor.replace('.', '').replace(',', '.'))
     return float(valor.replace('.', '').replace(',', '.'))
@@ -104,12 +105,12 @@ def valores_únicos(df, coluna):
         st.error(f"Erro ao extrair valores únicos: {e}")
         return []
 
-#############################################
-#         UPLOAD DO ARQUIVO ZIP             #
-#############################################
+# ============================= #
+# =========== Código ========== #
+# ============================= #
 
-st.markdown("### Faça o upload do arquivo ZIP contendo os arquivos:")
-uploaded_zip = st.file_uploader("Upload ZIP", type=["zip"])
+st.title('Cálculo FPR - Extração do arquivo posição')
+uploaded_zip = st.file_uploader("Faça o upload do arquivo ZIP contendo os arquivos:", type=["zip"])
 
 if uploaded_zip is not None:
     zip_bytes = BytesIO(uploaded_zip.read())
@@ -117,7 +118,6 @@ if uploaded_zip is not None:
     extraction_path, temp_dir_obj = extrair_zip(zip_bytes)
 
     extracted_files = os.listdir(extraction_path)
-    # st.write("Arquivos extraídos:", extracted_files)
     
     dict = {}
     for arquivo in extracted_files:
@@ -129,9 +129,6 @@ if uploaded_zip is not None:
                 dict[key] = df_temp
         except Exception as e:
             st.error(f"Erro ao processar o arquivo '{arquivo}': {e}")
-    # st.write('Resumo dos DataFrames: ')
-    # for key, df in dict.items():
-        # st.write(f"**{key}**: {df.shape[0]} linhas, {df.shape[1]} colunas")
     
     valores = valores_únicos(df=dict['Renda_Fixa'], coluna='CARTEIRA')
     print('Valores únicos(Fundos): ')
@@ -145,43 +142,40 @@ if uploaded_zip is not None:
             col_fund1, col_fund2, col_fund3, col_fund4 = st.columns(4)
             with col_fund1:
                 opção_selecionada = st.selectbox(
-                    'Selecione um fundo:',
+                    'Fundo:',
                     valores,
                     index=list(valores).index(valor_inicial) if valor_inicial in valores else 0
                 )
             with col_fund2:
                 data_mes = st.text_input(
-                    'Informe a data desejada:',
+                    'Data:',
                     placeholder="Exemplo: 31/12/2024"
                 )
             with col_fund3:
-                cota = st.selectbox("Selecione o tipo de cota:", options=['SUB', 'SR'], index=0)
+                cota = st.selectbox("Cota:", options=['SUB', 'SR'], index=0)
             with col_fund4:
-                investimento = st.number_input("Informe o valor do Investimento:",
+                investimento = st.number_input("Investimento:",
                                             min_value=0.0,
                                             step=0.01,
                                             format="%.2f")
             col_fund5, col_fund6 = st.columns(2)
             with col_fund5:
-                uploaded_csv = st.file_uploader("Faça o upload do arquivo CSV (Estoque):", type=["csv", "xlsx"])
+                uploaded_csv = st.file_uploader("Estoque:", type=["csv", "xlsx"])
             with col_fund6:
-                uploaded_excel = st.file_uploader("Faça o upload do arquivo Posição:", type=["xlsx", "csv", "xls"])
-            # Também pode colocar outros inputs (como uploads adicionais) se necessário
+                uploaded_excel = st.file_uploader("Posição:", type=["xlsx", "csv", "xls"])
             submit_button = st.form_submit_button("Executar Análise")
 
-        # Só execute o processamento se o usuário submeteu o formulário:
         if submit_button:
             st.session_state["cota"] = cota
             st.session_state["investimento"] = investimento
 
-            #### ---- Obtenção do PL ---- ####
+#### ---- Obtenção do PL ---- ####
+
         # RENDA FIXA
         renda_fixa = dict['Renda_Fixa']
         renda_fixa = renda_fixa[renda_fixa["CARTEIRA"] == opção_selecionada]
         
-        # Verifica se o fundo que estamos utilizando para o cálculo envolve o FIDC CONSIG PUB
         if renda_fixa['CARTEIRA'].str.contains('FIDC CONSIG PUB').any():
-            # Caso seja, realiza a renomeação da nomeclatura.
             renda_fixa['TITULO'] = renda_fixa['TITULO'].replace({'COTA MEZANINO': 'COTA SENIOR'})
 
         renda_fixa = renda_fixa[['TITULO', 'VALORLIQUIDO']]
@@ -211,10 +205,9 @@ if uploaded_zip is not None:
         print(df_pl)
         print()
 
-        #### ---- Obtenção do Saldo ---- ####
+#### ---- Obtenção do Saldo ---- ####
 
         if uploaded_csv is not None:
-            # Utiliza da Função para ler o arquivo em CSV.
             df1 = ler(uploaded_csv)
             st.success("Arquivo carregado com sucesso.")
         else:
@@ -238,29 +231,26 @@ if uploaded_zip is not None:
         soma_valores['ATRASO'] = (soma_valores['DATA_REFERENCIA'] - soma_valores['DATA_VENCIMENTO_AJUSTADA_2']).dt.days
         soma_valores['DATA_EMISSAO_2'] = pd.to_datetime(soma_valores['DATA_EMISSAO_2'])
         soma_valores['Ativo problemático'] = soma_valores.apply(ativ_probl, axis=1, data=data_mes)
-        # CONTRATO:
-        # Soma para valores com ATRASO > 90
+# CONTRATO:
         over_90_saldo = soma_valores.loc[soma_valores['ATRASO'] > 90, 'VALOR_PRESENTE'].sum()
-        # Soma para valores com ATRASO < 90
         below_90_saldo = soma_valores.loc[soma_valores['ATRASO'] <= 90, 'VALOR_PRESENTE'].sum()
         total_saldo = over_90_saldo + below_90_saldo
-        # Soma para valores com ATRASO > 90
         over_90_pdd = soma_valores.loc[soma_valores['ATRASO'] > 90, 'VALOR_PDD'].sum()
-        # Soma para valores com ATRASO < 90
         below_90_pdd = soma_valores.loc[soma_valores['ATRASO'] <= 90, 'VALOR_PDD'].sum()
         total_pdd = over_90_pdd + below_90_pdd
         contrato = total_saldo - total_pdd
         print('Contratos: ', contrato.round(2))
         print()
 
-        # CAIXA
+# CAIXA
         patrimonio['SALDOCAIXAATUAL'] = patrimonio['SALDOCAIXAATUAL']\
     .astype(str)\
     .apply(tratar_valores)
         caixa = patrimonio['SALDOCAIXAATUAL'].iloc[0] 
         print('Caixa: ', caixa)
         print()
-        # CONTAS Á RECEBER E Á PAGAR
+
+# CONTAS Á RECEBER E Á PAGAR
         try:
             contas = dict['CPR-Lancamentos']
             contas = contas[contas["CARTEIRA"] == opção_selecionada]
@@ -277,12 +267,11 @@ if uploaded_zip is not None:
         print("Receber:", receber)
         print()
 
-        # FUNDO
+# FUNDO
 
         if "Fundos-Fundos" in dict:
             fundos = dict['Fundos-Fundos']
             fundos = fundos[fundos["CARTEIRA"] == opção_selecionada]
-            # Verifica se as colunas necessárias existem.
             if all(col in fundos.columns for col in ['CODIGO', 'VALORLIQUIDO']):
                 df_fundos = fundos[['CODIGO', 'VALORLIQUIDO']]
                 df_fundos.loc[:, 'VALORLIQUIDO'] = df_fundos.loc[:, 'VALORLIQUIDO'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False).astype(float)
@@ -295,12 +284,12 @@ if uploaded_zip is not None:
             fundo = 0
         print('Valor Total envolvendo os fundos: ', fundo)
 
-        # RENDA FIXA
+# RENDA FIXA
         renda_fixa_nao_desejada = renda_fixa_grouped[~renda_fixa_grouped['TITULO'].isin(titulos_desejados)]
         renda = renda_fixa_nao_desejada['VALORLIQUIDO'].sum()
         print('Outras Rendas: ', renda)
 
-        # OUTROS ATIVOS
+# OUTROS ATIVOS
         if 'Outros_Ativos' in dict:
             ativos = dict['Outros_Ativos']
             ativos = ativos[ativos["CARTEIRA"] == opção_selecionada]
@@ -313,18 +302,17 @@ if uploaded_zip is not None:
             outros_ativos = 0
         print('Soma dos outros ativos: ', outros_ativos)
 
+# DATAFRAME DF_SALDO
         data = []
         data.append(('Contrato', contrato.round(2)))
         data.append(('Caixa', caixa))
         data.append(('Pagar', pagar))
         data.append(('Receber', receber))
-        # Verificar se 'Fundos-Fundos' está presente no dicionário
         if 'Fundos-Fundos' in dict:
             for _, row in df_fundos.iterrows():
                 data.append((row['CODIGO'], row['VALORLIQUIDO']))
         else:
             data.append(('Fundo', fundo))
-        # Verifica se há 'Renda Fixa' á ser add no dataframe
         if not renda_fixa_nao_desejada.empty:
             for _, row in renda_fixa_nao_desejada.iterrows():
                 data.append((row['TITULO'], row['VALORLIQUIDO']))
@@ -342,11 +330,10 @@ if uploaded_zip is not None:
 
         df_saldo = pd.DataFrame(data, columns=['Index', 'SALDO'])
         df_saldo.set_index('Index', inplace=True)
-
         print("DataFrame Saldo:")
         print(df_saldo)
 
-        # COMPARAÇÃO ENTRE OS VALORES:
+# COMPARAÇÃO ENTRE OS VALORES:
         print('# ---- Comparação entre valores ---- #')
         print()
         if df_saldo['SALDO'].sum().round(2) == soma_total.round(2):
@@ -357,30 +344,33 @@ if uploaded_zip is not None:
             diferenca = df_saldo['SALDO'].sum().round(2) - soma_total.round(2)
             print(f"A DIFERENÇA É DE: {diferenca:,.2f}")
         
-        #### ---- Obtenção do DataBase ---- ####
+#### ---- Obtenção do DataBase ---- ####
         investimento = investimento
         valor_investido = investimento
         valor_investido = float(valor_investido)
         valor_investido
-
         porcentagem = valor_investido / df_saldo['SALDO'].sum()
-        # PORCENTAGEM
+
+# PORCENTAGEM
         porcentagem = porcentagem 
-                
         print('Valor da Porcentagem: ', porcentagem)
         dicionario = {}
         dicionario['Porcentagem'] = porcentagem
 
-        # VALOR PRESENTE PROPORCIONAL
+# VALOR PRESENTE PROPORCIONAL
         soma_valores['TIPO_RECEBIVEL'] = soma_valores['TIPO_RECEBIVEL'].apply(lambda x: x.encode('latin1').decode('utf-8'))
         soma_valores['VP_PROPORCIONAL'] = soma_valores['VALOR_PRESENTE'] * porcentagem
-        # VALOR PDD PROPORCIONAL
+
+# VALOR PDD PROPORCIONAL
         soma_valores['PDD_PROPORCIONAL'] = soma_valores['VALOR_PDD'] * porcentagem
-        # ATIVOS PROBLEMÁTICOS
+
+# ATIVOS PROBLEMÁTICOS
         soma_valores.loc[:, 'ATV_PROBL'] = soma_valores.apply(calcular_atv_probl, axis=1)
-        # PF/PJ
+
+# PF/PJ
         soma_valores.loc[:, 'PF/PJ'] = soma_valores['DOC_SACADO'].astype(str).apply(classificar_pessoa)
-        # FPR
+
+# FPR
         soma_valores['FPR'] = np.where(
                 soma_valores['TIPO_RECEBIVEL'] == "Precatórios", 12.5,
                 np.where(
@@ -395,11 +385,13 @@ if uploaded_zip is not None:
                     )
                 )
             )
-        # RWA
+        
+# RWA
         soma_valores['RWACPAD']  = (soma_valores['VP_PROPORCIONAL'] - soma_valores['PDD_PROPORCIONAL']) * soma_valores['FPR']
 
-    #### ---- Cálculo do FPR e RWA ---- ####
-        # FPR
+#### ---- Cálculo do FPR e RWA ---- ####
+
+# FPR
         dicionário = {
             'Contrato': soma_valores['RWACPAD'].sum() / (soma_valores['VP_PROPORCIONAL'] - soma_valores['PDD_PROPORCIONAL']).sum(),
             'Caixa': 0.2,
@@ -408,14 +400,14 @@ if uploaded_zip is not None:
         }
         df_saldo['FPR'] = df_saldo.index.map(dicionário)
 
-        # RWA
+# RWA
         df_saldo['RWA'] = df_saldo['SALDO'] * df_saldo['FPR']
 
-        # DATAFRAME
+# DATAFRAME
         print("DataFrame Saldo Atualizado:")
         print(df_saldo)
 
-        #### ---- Obtenção do FPR Final Apurado ---- ####
+#### ---- Obtenção do FPR Final Apurado ---- ####
         def calcular_fpr_final(df_saldo, df_pl, soma_total, over_90_saldo, over_90_pdd, pagar, receber, cota):
             outros = 0
             if 'Ajuste' in df_saldo.index and pd.notna(df_saldo.loc['Ajuste', 'SALDO'] and df_saldo.loc['Ajuste', 'SALDO'] != 0):
@@ -424,9 +416,7 @@ if uploaded_zip is not None:
             sub = None
             sr = None
 
-            # Definiação dos valores para sub e sr:
-
-            if 'CARTEIRA' in patrimonio.columns:  # Verifica se a coluna existe para evitar erros.
+            if 'CARTEIRA' in patrimonio.columns:  
                 if patrimonio['CARTEIRA'].str.contains('FIDC REAG H Y').any():
                     if cota == 'SUB':
                         sub = df_pl.loc['COTA JUNIOR', 'VALORLIQUIDO'] / soma_total
@@ -476,11 +466,11 @@ if uploaded_zip is not None:
                 print('SR:', sr.round(2))
                 dicionario['SR'] = sr
 
-            # Cálculo da Razão da Inadimplência
+# Cálculo da Razão da Inadimplência
             razao_inadimplencia = ((over_90_saldo - over_90_pdd) + outros) / df_saldo['SALDO'].sum()
             dicionario['Inadimplência'] = razao_inadimplencia
 
-            # Valores para o Encaixe e Desencaixe
+# Valores para o Encaixe e Desencaixe
             if cota == 'SR':
                 ponto_encaixe = sub
                 ponto_desencaixe = 1.0
@@ -494,7 +484,7 @@ if uploaded_zip is not None:
             print('Ponto de Encaixe: ', ponto_encaixe, 'Ponto de Desencaixe: ', ponto_desencaixe, 'Razão da Inadimplência: ', razao_inadimplencia.round(4))
             print('SUB:', sub, 'SR:', sr)
 
-            # Variáveis para o Cálculo do FPR
+# Variáveis para o Cálculo do FPR
             A = ponto_encaixe
             dicionario['A'] =  A
             D = ponto_desencaixe
@@ -507,12 +497,12 @@ if uploaded_zip is not None:
             dicionario['V'] = V
             F = 0.08
 
-            # Cálculo de Ksa
+# Cálculo de Ksa
             Ksa = (RWAhip * F) / V
             dicionario['Ksa'] = Ksa
             print(f"Ksa: {Ksa:.2%}")
 
-            # Cálculo do Ka
+# Cálculo do Ka
             Ka = ((1 - W) * Ksa + (W * 0.5))
             print(f"Ka: {Ka:.2%}")
             dicionario['Ka'] = Ka
@@ -593,42 +583,38 @@ if uploaded_zip is not None:
             print(f"{FPR_apurado:.0%}")
             return FPR_apurado
 
-        #### ---- Interface do Streamlit ---- #####
-        st.title("Editar DataFrame Dinamicamente no Streamlit")
+#### ---- Interface do Streamlit ---- #####
+        st.title("Edição do DataFrame")
 
-        # Selecionar as colunas a serem exibidas.
         columns_to_display = ['Index', 'SALDO', 'FPR']
         editable_columns = df_saldo.reset_index()[columns_to_display]
 
-        # Adicionar várias linhas em branco (exemplo: 5 linhas)
         num_blank_rows = 10
         blank_rows = pd.DataFrame([{'Index': '', 'SALDO': 0, 'FPR': None}] * num_blank_rows)
         editable_columns = pd.concat([editable_columns, blank_rows], ignore_index=True)
 
-        # Exibir DataFrame editável
         st.markdown(
         """
-        <hr style="border: 1px solid white; margin: 20px 0;">
+        <hr style="border: 1px solid black; margin: 20px 0;">
         """, unsafe_allow_html=True)
 
         st.write("## 1) Edição dos Valores da Coluna FPR:")
         edited_subset = st.data_editor(editable_columns, use_container_width=True)
 
-        # Processar edições realizadas pelo usuário:
         updated_df = edited_subset[edited_subset['Index'] != ''].set_index('Index')
         updated_df['SALDO'] = updated_df['SALDO'].astype(float)
         updated_df['FPR'] = updated_df['FPR'].astype(float)
 
-        # Recalcular a coluna RWA
+# Recalcular a coluna RWA
         updated_df['RWA'] = updated_df['SALDO'] * updated_df['FPR']
 
-        # Atualizar o DataFrame original
+# Atualizar o DataFrame original
         df_saldo = updated_df
         df_saldo = df_saldo[~df_saldo.index.isin(["Renda Fixa", "Outros Ativos"])]
         
         st.markdown(
         """
-        <hr style="border: 1px solid white; margin: 20px 0;">
+        <hr style="border: 1px solid black; margin: 20px 0;">
         """, unsafe_allow_html=True)
         st.write("## 2) Comparação entre DataFrames:")
         fpr_final = calcular_fpr_final(
@@ -648,7 +634,7 @@ if uploaded_zip is not None:
             # st.write(f'EXPO: {locale.format_string('%.2f', expo, grouping=True)}')
             st.markdown(
             f"""
-            <div style="text-align: center; font-size: 24px; font-weight: bold; color: white;">
+            <div style="text-align: center; font-size: 24px; font-weight: bold; color: black;">
             Comparação entre os valores:
             </div>
             """,
@@ -678,7 +664,7 @@ if uploaded_zip is not None:
             st.write('### Database:')
             st.dataframe(soma_valores)
 
-        st.write('#### Saldo %')
+        st.write('#### Saldo %:')
         saldo_porcentagem = df_saldo['SALDO'] * porcentagem
         st.dataframe(saldo_porcentagem.to_frame().T)
         st.write('### Informações:')
@@ -688,7 +674,7 @@ if uploaded_zip is not None:
         st.dataframe(df_dicionário.T)
         st.markdown(
         """
-        <hr style="border: 1px solid white; margin: 20px 0;">
+        <hr style="border: 1px solid black; margin: 20px 0;">
         """,
         unsafe_allow_html=True)
         st.markdown(
@@ -700,25 +686,21 @@ if uploaded_zip is not None:
                 unsafe_allow_html=True,)
         st.markdown(
         """
-        <hr style="border: 1px solid white; margin: 20px 0;">
+        <hr style="border: 1px solid black; margin: 20px 0;">
         """,
         unsafe_allow_html=True)
 
+#### ---- Arquivo de Posição ---- #####
+
         st.write("## 3) Arquivo Posição:")
-        # st.write('### Arquivo Modelo:')
-        # st.write("* Utilize o DataFrame abaixo como modelo; em tese, é o arquivo enviado do mês anterior.")
-        # # st.write("* Caso não apareça o DataFrame Modelo abaixo, utilize o comando: streamlit run app.py --server.maxMessageSize 500")
         if uploaded_excel is not None:
             df_excel = pd.read_excel(uploaded_excel)
-            #st.dataframe(df_excel)
         else:
             st.warning("Nenhum arquivo Excel foi carregado.")
-        
-        # st.write('Arquivo CSV á ser exportado:')
+    
         st.write('### DataFrame Editável:')
         segunda_coluna = df_excel.iloc[:, 1]
 
-        # Alteração dos valores do DataFrame:
         posicao = pd.DataFrame()
         posicao['X'] = soma_valores['VP_PROPORCIONAL']
         posicao['Sistema Origem'] = opção_selecionada
@@ -828,7 +810,7 @@ if uploaded_zip is not None:
         edited_posicao = st.data_editor(posicao, num_rows="dynamic", use_container_width=True, height=600)
 
         st.write("### Arquivo Final:")
-        st.write('* Faço o download deste arquivo no formato CSV.')
+        st.write('* Faço o download do arquivo posição.')
         lista = [
             "Data do Ciclo",
             data_mes,
@@ -849,120 +831,105 @@ if uploaded_zip is not None:
             "Unnamed: 52","Unnamed: 53", "Unnamed: 54", "Unnamed: 55"
         ]
 
-        # Alteração das colunas:
         num_colunas = len(edited_posicao.columns)
         if len(lista) < num_colunas:
             lista.extend([""] * (num_colunas - len(lista)))
         elif len(lista) > num_colunas:
             lista = lista[:num_colunas]
 
-        # Adicionar a primeira linha com os nomes das colunas atuais
         edited_posicao.loc[-1] = edited_posicao.columns 
         edited_posicao.index = edited_posicao.index + 1 
-        edited_posicao = edited_posicao.sort_index()  # Reorganiza o índice
+        edited_posicao = edited_posicao.sort_index()  
 
-        # Substituir os nomes das colunas pelo conteúdo da lista ajustada
         edited_posicao.columns = lista
 
         st.dataframe(edited_posicao)
 
-        uploaded_csv = st.file_uploader("### Faça o upload do arquivo POSIÇÃO em csv", type=["csv"])
+#### ---- Edição do Arquivo Posição ---- #####
+
+        uploaded_csv = st.file_uploader("### Faça o upload do arquivo POSIÇÃO", type=["csv"])
 
         if uploaded_csv is not None:
             df = pd.read_csv(uploaded_csv)
             df.columns = ["" if "Unnamed" in col else col for col in df.columns]
 
-            # Converter o DataFrame para Excel
             output = BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 df.to_excel(writer, index=False, sheet_name="Sheet1")
             excel_data = output.getvalue()
 
-             # Salvar o arquivo temporariamente para modificações com a biblioteca openpyxl
             temp_excel_path = "temp_arquivo_convertido.xlsx"
             with open(temp_excel_path, "wb") as temp_file:
                 temp_file.write(excel_data)
 
-            # Modificar o arquivo gerado
             wb = load_workbook(temp_excel_path)
             ws = wb.active
 
-            # Exclusão da primeira coluna
             ws.delete_cols(1)
 
-            # Formatação da coluna "Data do Ciclo":
             for row in ws.iter_rows(min_row=2, min_col=1, max_col=1):
                 for cell in row:
                     if cell.value is not None:
                         cell.number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1
 
-            # Formatação da coluna "Alias":
             for row in ws.iter_rows(min_row=2, min_col=2, max_col=2):
                 for cell in row:
                     if cell.value is not None:
                         cell.number_format = numbers.FORMAT_DATE_DDMMYY
 
             
-            coluna_L = 12  # Coluna L é a 12ª coluna.
+            coluna_L = 12  
             soma_coluna = 0
 
-            for row in ws.iter_rows(min_row=2, min_col=coluna_L, max_col=coluna_L):  # Iteração a partir da segunda linha
+            for row in ws.iter_rows(min_row=2, min_col=coluna_L, max_col=coluna_L): 
                 for cell in row:
                     if cell.value is not None:  
                         try:
                             cell.value = float(cell.value) 
                             soma_coluna += cell.value  
-                            cell.number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1  # Formatar como numérico
+                            cell.number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1  
                         except ValueError:
-                            pass  # Ignorar erros de conversão, caso a célula tenha um valor inválido.
+                            pass 
 
-            # Renomeação da coluna L com a soma obtida:
             ws.cell(row=1, column=coluna_L).value = soma_coluna
             ws.cell(row=1, column=coluna_L).number_format = numbers.FORMAT_NUMBER_COMMA_SEPARATED1
             
-            # Tratamento de Dados da coluna D.
             coluna_D = "D"  
             coluna_D_index = ws[coluna_D + "1"].column  
 
-            # Iterar pelas células a partir da segunda linha na coluna D:
             for row in ws.iter_rows(min_row=2, min_col=coluna_D_index, max_col=coluna_D_index):
                 for cell in row:
                     if cell.value is not None: 
                         try:
                             valor = float(cell.value)
-                            if valor == 0.0:  # Se for 0.0 (Geral), substitui por 0.
+                            if valor == 0.0:  
                                 cell.value = 0
                             else:
                                 cell.value = valor  
                             cell.number_format = numbers.FORMAT_NUMBER  
                         except ValueError:
                             pass
-            
-            # Tratamento de dados da coluna S:
+
             coluna_S = "S"
             coluna_S_index = ws[coluna_S + "1"].column  
 
-            # Converte os valores da coluna "S" para números e formata com duas casas decimais
             soma_coluna_S = 0
             for row in ws.iter_rows(min_row=2, min_col=coluna_S_index, max_col=coluna_S_index):
                 for cell in row:
-                    if cell.value not in (None, "0", "0.0", 0.0):  # Ignora valores nulos ou zero
+                    if cell.value not in (None, "0", "0.0", 0.0):  
                         try:
                             cell.value = round(float(cell.value), 2)
                             soma_coluna_S += cell.value  
-                            cell.number_format = "#,##0.00"  # Formato de número com duas casas decimais
+                            cell.number_format = "#,##0.00"  
                         except ValueError:
                             pass 
 
-            # Atualiza o cabeçalho da coluna "S" com a soma
             ws[coluna_S + "1"].value = round(soma_coluna_S, 2)
             ws[coluna_S + "1"].number_format = "#,##0.00"
 
-            # Acessa a coluna "AB"
             coluna_AB = "AB"
-            coluna_AB_index = ws[coluna_AB + "1"].column  # Obtém o índice da coluna "AB"
+            coluna_AB_index = ws[coluna_AB + "1"].column  
 
-            # Converte os valores da coluna "AB" para números e formata com duas casas decimais
             for row in ws.iter_rows(min_row=2, min_col=coluna_AB_index, max_col=coluna_AB_index):
                 for cell in row:
                     if cell.value not in (None, "0", "0.0", 0.0):  
@@ -972,7 +939,6 @@ if uploaded_zip is not None:
                         except ValueError:
                             pass 
             
-            # Transformar a coluna AA em formato de data (a partir da segunda linha):
             for cell in ws['AA'][1:]:
                 if cell.value:
                     cell.number_format = 'DD/MM/YYYY'
@@ -988,25 +954,21 @@ if uploaded_zip is not None:
                             max_length = max(max_length, len(str(cell.value)))
                     except:
                         pass
-                adjusted_width = max_length + 2  # Ajuste adicional
+                adjusted_width = max_length + 2  
                 ws.column_dimensions[col_letter].width = adjusted_width
             
-            # Tratamento das bordas das coluna:
             borda_vazia = Border(left=Side(border_style=None),
                      right=Side(border_style=None),
                      top=Side(border_style=None),
                      bottom=Side(border_style=None))
 
-            # Iterar pelas células na primeira linha
             for cell in ws[1]:
                 if cell.value is None:  
-                    cell.border = borda_vazia  # Remover as bordas
+                    cell.border = borda_vazia  
 
-            # Salvar as alterações no arquivo Excel
             wb.save(temp_excel_path)
             wb.close()
 
-            # Reabrir o arquivo modificado e preparar para download
             with open(temp_excel_path, "rb") as modified_file:
                 modified_excel_data = modified_file.read()
 
