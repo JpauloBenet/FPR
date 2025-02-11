@@ -594,9 +594,9 @@ if uploaded_zip is not None:
             editable_columns = pd.concat([editable_columns, blank_rows], ignore_index=True)
 
             st.markdown(
-            """
-            <hr style="border: 1px solid black; margin: 20px 0;">
-            """, unsafe_allow_html=True)
+                """
+                <hr style="border: 1px solid #064635; margin: 20px 0;">
+                """, unsafe_allow_html=True)
 
             st.write("## 1) Edição dos Valores da Coluna FPR:")
             edited_subset = st.data_editor(editable_columns, use_container_width=True)
@@ -612,10 +612,11 @@ if uploaded_zip is not None:
             df_saldo = updated_df
             df_saldo = df_saldo[~df_saldo.index.isin(["Renda Fixa", "Outros Ativos"])]
             
+            
             st.markdown(
-            """
-            <hr style="border: 1px solid black; margin: 20px 0;">
-            """, unsafe_allow_html=True)
+                """
+                <hr style="border: 1px solid #064635; margin: 20px 0;">
+                """, unsafe_allow_html=True)
             st.write("## 2) Comparação entre DataFrames:")
             fpr_final = calcular_fpr_final(
                 df_saldo, df_pl, soma_total, over_90_saldo, over_90_pdd, pagar, receber, cota
@@ -672,11 +673,11 @@ if uploaded_zip is not None:
             df_dicionário.set_index('Item', inplace=True)
             df_dicionário['Valor dos Itens'] = df_dicionário['Valor dos Itens'].round(3)
             st.dataframe(df_dicionário.T)
+            
             st.markdown(
-            """
-            <hr style="border: 1px solid black; margin: 20px 0;">
-            """,
-            unsafe_allow_html=True)
+                """
+                <hr style="border: 1px solid #064635; margin: 20px 0;">
+                """, unsafe_allow_html=True)
             st.markdown(
                     f"""
                     <div style="text-align: center; font-size: 30px; font-weight: bold;">
@@ -684,11 +685,11 @@ if uploaded_zip is not None:
                     </div>
                     """,
                     unsafe_allow_html=True,)
+            
             st.markdown(
-            """
-            <hr style="border: 1px solid black; margin: 20px 0;">
-            """,
-            unsafe_allow_html=True)
+                """
+                <hr style="border: 1px solid #064635; margin: 20px 0;">
+                """, unsafe_allow_html=True)
 
     #### ---- Arquivo de Posição ---- #####
 
@@ -808,7 +809,11 @@ if uploaded_zip is not None:
             posicao.loc[mask_other, 'Produto'] = 'VALOR_A_RECEBER_FIDC'
 
             edited_posicao = st.data_editor(posicao, num_rows="dynamic", use_container_width=True, height=600)
-
+            
+            st.markdown(
+                """
+                <hr style="border: 1px solid #064635; margin: 20px 0;">
+                """, unsafe_allow_html=True)
             st.write("### Arquivo Final:")
             st.write('* Faço o download do arquivo posição.')
             lista = [
