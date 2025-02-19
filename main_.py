@@ -226,10 +226,21 @@ if uploaded_zip is not None:
                     )
 
             soma_valores = combined_df
-            soma_valores['DATA_REFERENCIA'] = pd.to_datetime(soma_valores["DATA_REFERENCIA"])
-            soma_valores['DATA_VENCIMENTO_AJUSTADA_2'] = pd.to_datetime(soma_valores['DATA_VENCIMENTO_AJUSTADA_2'])
+            try: 
+                soma_valores['DATA_REFERENCIA'] = soma_valores['DATA_REFERENCIA'].dt.date
+                soma_valores['DATA_REFERENCIA'] = pd.to_datetime(soma_valores["DATA_REFERENCIA"], errors='coerce')
+            except:
+                soma_valores['DATA_REFERENCIA'] = pd.to_datetime(soma_valores['DATA_REFERENCIA'], dayfirst=True, errors='coerce')
+            try:
+                soma_valores['DATA_VENCIMENTO_AJUSTADA_2'] = soma_valores['DATA_VENCIMENTO_AJUSTADA_2'].dt.date
+                soma_valores['DATA_VENCIMENTO_AJUSTADA_2'] = pd.to_datetime(soma_valores['DATA_VENCIMENTO_AJUSTADA_2'], errors='coerce')
+            except:
+                soma_valores['DATA_VENCIMENTO_AJUSTADA_2'] = pd.to_datetime(soma_valores['DATA_VENCIMENTO_AJUSTADA_2'], dayfirst=True, errors='coerce')
             soma_valores['ATRASO'] = (soma_valores['DATA_REFERENCIA'] - soma_valores['DATA_VENCIMENTO_AJUSTADA_2']).dt.days
-            soma_valores['DATA_EMISSAO_2'] = pd.to_datetime(soma_valores['DATA_EMISSAO_2'])
+            try:
+                soma_valores['DATA_EMISSAO_2'] = pd.to_datetime(soma_valores['DATA_EMISSAO_2'])
+            except:
+                soma_valores['DATA_EMISSAO_2'] = pd.to_datetime(soma_valores['DATA_EMISSAO_2'], dayfirst=True, errors='coerce')
             soma_valores['Ativo problemático'] = soma_valores.apply(ativ_probl, axis=1, data=data_mes)
     # CONTRATO:
             over_90_saldo = soma_valores.loc[soma_valores['ATRASO'] > 90, 'VALOR_PRESENTE'].sum()
